@@ -1,0 +1,705 @@
+---
+title: "Linear Regression"
+author: "Group 2"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    theme:
+      light: flatly
+---
+
+# Group Members
+
+1.  Abdul Mukmin Bin Mohamed Aminuddin
+2.  Aina Syazwani Binti Aziz
+3.  Mohd Khairi Safwan Bin Johari
+4.  Mohd Khairul Hanan Bin Mohd Wajiah
+5.  Muhammad Aminuddin Bin Che Hashim
+
+# Introduction to dataset
+
+We will use dataset from kaggle.com. This dataset is designed to study the impact of various lifestyle factors on an individual's health score using linear regression analysis. It provides a comprehensive view of factors such as age, BMI, exercise frequency, diet quality, sleep hours, smoking status, and alcohol consumption. The dataset can be used for exploratory data analysis, machine learning models, and understanding correlations between health and lifestyle.
+
+Dataset Description:
+
+-   Age: Age of individual in years (continuous variable).
+
+-   BMI: Body Mass Index of individual (continuous variable)
+
+-   Exercise_Frequency: Number of days per week the individual exercises (categorical, values 0-7).
+
+-   Diet_Quality: An index reflecting diet quality, with higher values indicating healthier dietary habits (continuous, 0-100).
+
+-   Sleep_Hours: Average hours of sleep per night (continuous).
+
+-   Smoking_Status: Binary variable where 0 = Non-smoker, 1 = Smoker.
+
+-   Alcohol_Consumption: Average alcohol units consumed per week (continuous).
+
+-   Health_Score: A calculated health score reflecting overall health status (continuous, 0-100).
+
+# Creating the environment
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+library(haven)
+library(gtsummary)
+library(corrplot)
+```
+
+```{r}
+library(readxl)
+library(broom)
+library(broom.helpers)
+library(ggplot2)
+```
+
+# Uploading the dataset
+
+You can download the csv dataset from this [link](https://www.kaggle.com/datasets/pratikyuvrajchougule/health-and-lifestyle-data-for-regression){target="_blank"}
+
+```{r}
+health1 <- read_csv("synthetic_health_data.csv")
+glimpse(health1)
+```
+
+# Data Wrangling
+
+Change variable smoking status (binary) to factor
+
+```{r}
+health1 <- health1 %>% 
+  mutate(across(c(Smoking_Status), as_factor))
+glimpse(health1)
+```
+
+Change binary observation for smoking status to categorical
+
+```{r}
+health1$Smoking_Status <- factor(health1$Smoking_Status,
+                                 levels = c(0,1),
+                                 labels = c("non-smoker", "smoker"))
+glimpse(health1)
+```
+
+# Data exploration
+
+```{r}
+summary(health1)
+```
+
+Descriptive analysis of the dataset in table format
+
+```{r}
+health1 %>% 
+  tbl_summary( 
+    statistic = list(all_continuous()~"{mean} ({sd})",
+                     all_categorical()~"{n} /{N} ({p}%)"),
+    digits= all_continuous() ~2 ) %>% 
+  modify_caption("Characteristic (N = {N})") %>% 
+  as_gt()
+```
+
+# Data visualization
+
+1.  Health score
+
+```{r}
+ggplot(health1, aes(Health_Score))+
+  geom_histogram()
+```
+
+2.  Health score according to smoking status
+
+```{r}
+ggplot(health1, aes(Health_Score))+
+  geom_histogram()+
+  facet_grid(Smoking_Status ~.)
+```
+
+3.  Age of participant
+
+```{r}
+ggplot(health1, aes(Age))+
+  geom_histogram()
+```
+
+4.  BMI of participant
+
+```{r}
+ggplot(health1, aes(BMI))+
+  geom_histogram()
+```
+
+5.  Exercise frequency (days per week)
+
+```{r}
+ggplot(health1, aes(Exercise_Frequency))+
+  geom_histogram()+
+  ylab("Number of participant")+
+  xlab("Days Per Week")+
+  ggtitle("Exercise Frequency")
+```
+
+6.  Diet Quality
+
+```{r}
+ggplot(health1, aes(Diet_Quality))+
+  geom_histogram()
+```
+
+7.  Sleep hours
+
+```{r}
+ggplot(health1, aes(Sleep_Hours))+
+  geom_histogram()
+```
+
+8.  Alcohol consumption (average alcohol unit consumption per week)
+
+```{r}
+ggplot(health1, aes(Alcohol_Consumption))+
+  geom_histogram()
+
+```
+
+# Causal pathway
+
+```{r}
+library(dagitty)
+library(ggdag)
+```
+
+```{r}
+health_dag <- dagitty('
+dag {
+  HS [outcome]
+  
+  EX -> HS
+  BMI -> HS
+  Age -> HS
+  Sleep -> HS
+  Alc-> HS
+  Smoker-> HS
+  Smoker -> Sleep
+  Diet -> HS
+  EX -> BMI
+  Diet-> BMI
+  Age -> BMI
+  Diet-> EX
+  Alc-> Sleep
+}'
+)
+
+ggdag(health_dag)
+
+
+```
+
+Note: HS= Health Score, EX = Exercise Frequency, Alc = Alcohol Consumption
+
+# Check correlation between numerical variables
+
+```{r}
+health2 <- health1 %>% select(where(is.numeric))
+```
+
+```{r}
+cor.health2 <-
+  cor(health2,
+      use = "complete.obs",
+      method = "pearson")
+head(round(cor.health2,2))
+```
+
+Construct correlogram (for easier understanding)
+
+```{r}
+corrplot(cor.health2, method = "circle")
+```
+
+Note: there are no correlation between all of numerical variables.
+
+# Univariable analysis
+
+## Health score as an outcome and age as predictor
+
+```{r}
+mod_age = lm(Health_Score~ Age, data = health1)
+summary(mod_age)
+```
+
+```{r}
+tidy(mod_age, conf.int = TRUE)
+```
+
+```{r}
+tbl_regression(mod_age)
+```
+
+## Health score with BMI
+
+```{r}
+mod_BMI = lm(Health_Score ~ BMI, data= health1 )
+summary(mod_BMI)
+```
+
+```{r}
+tidy(mod_BMI, conf.int = TRUE)
+```
+
+```{r}
+tbl_regression(mod_BMI)
+```
+
+## Health score with exercise frequency
+
+```{r}
+mod_exercise = lm(Health_Score ~ Exercise_Frequency, data= health1 )
+summary(mod_exercise)
+```
+
+```{r}
+tidy(mod_exercise, conf.int = TRUE)
+```
+
+```{r}
+tbl_regression(mod_exercise)
+```
+
+## Health score with diet quality
+
+```{r}
+mod_diet = lm(Health_Score ~ Diet_Quality, data= health1 )
+summary(mod_diet)
+```
+
+```{r}
+tidy(mod_diet, conf.int = TRUE)
+```
+
+```{r}
+tbl_regression(mod_diet)
+```
+
+## Health score with sleep hours
+
+```{r}
+mod_sleep = lm(Health_Score ~ Sleep_Hours, data= health1 )
+summary(mod_sleep)
+```
+
+```{r}
+tidy(mod_sleep, conf.int = TRUE)
+```
+
+```{r}
+tbl_regression(mod_sleep)
+```
+
+## Health score with smoking status
+
+```{r}
+mod_smoking = lm(Health_Score ~ Smoking_Status, data= health1 )
+summary(mod_smoking)
+```
+
+```{r}
+tidy(mod_smoking, conf.int = TRUE)
+```
+
+```{r}
+tbl_regression(mod_smoking)
+```
+
+## Health score with alcohol consumption
+
+```{r}
+mod_alcohol = lm(Health_Score ~ Alcohol_Consumption, data= health1 )
+summary(mod_alcohol)
+
+```
+
+```{r}
+tidy(mod_alcohol, conf.int = TRUE)
+```
+
+```{r}
+tbl_regression(mod_alcohol)
+```
+
+## Combine all univariable analysis in table
+
+```{r}
+#create a summary table for each model with confidence intervals
+tbl_age <- tbl_regression(mod_age, conf.level = 0.95)
+
+tbl_BMI <- tbl_regression(mod_BMI, conf.level = 0.95)
+
+tbl_exercise <- tbl_regression(mod_exercise, conf.level = 0.95)
+
+tbl_alcohol <- tbl_regression(mod_alcohol, conf.level = 0.95)
+
+tbl_diet <- tbl_regression(mod_diet, conf.level = 0.95)
+
+tbl_sleep <- tbl_regression(mod_sleep, conf.level = 0.95)
+
+tbl_smoking <- tbl_regression(mod_smoking, conf.level = 0.95)
+
+#Combine all tables into one
+SLR_table <- tbl_stack(
+  list(tbl_age, tbl_BMI, tbl_exercise, tbl_alcohol, tbl_diet, tbl_sleep, tbl_smoking)
+) %>%
+  as_gt() %>%
+  gt::tab_header(
+    title = "Simple Linear Regression Model"
+  )
+
+#Print the summary table
+SLR_table
+```
+
+# Multivariable analysis
+
+## Multivariable analysis without interaction
+
+```{r}
+mlr1 = lm (Health_Score ~ Age+ BMI + Exercise_Frequency + Diet_Quality +
+                    Sleep_Hours + Smoking_Status+ Alcohol_Consumption, data = health1)
+summary(mlr1)
+
+```
+
+```{r}
+tidy(mlr1, conf.int = TRUE)
+```
+
+Table summary for multiple linear without interaction
+
+```{r}
+tbl_regression(mlr1) %>% add_glance_table(include = c(adj.r.squared)) %>% 
+  bold_labels() %>% italicize_levels() %>% 
+  as_gt() %>% 
+  gt::tab_header(title = "Table 1. Multiple Linear Regression Model 1",
+                 subtitle = "Without Interaction")
+```
+
+## Multivariable analysis with interaction
+
+### Interaction between BMI and Diet Quality in the model
+
+```{r}
+mlr2 = lm (Health_Score ~ Age+ BMI + Exercise_Frequency + Diet_Quality +
+                    Sleep_Hours + Smoking_Status + 
+             Alcohol_Consumption+ Diet_Quality:BMI, data = health1)
+summary(mlr2)
+```
+
+```{r}
+tidy(mlr2, conf.int = TRUE)
+```
+
+Table summary for multiple linear regression with interaction
+
+```{r}
+tbl_regression(mlr2) %>% add_glance_table(include = c(adj.r.squared)) %>% 
+  bold_labels() %>% italicize_levels() %>% 
+  as_gt() %>% 
+  gt::tab_header(title = "Table 2. Multiple Linear Regression Model 2",
+                 subtitle = "With Interaction (BMI and Diet Quality)")
+```
+
+# Comparing model
+
+```{r}
+anova(mlr1, mlr2)
+```
+
+From ANOVA, p-value is less than 0.05. Hence, the interaction between Diet Quality and BMI has a significant effect on predicting Health score.
+
+Therefore, we choose model with interaction (mlr2) for our preliminary final model.
+
+# Model Assessment
+
+```{r}
+prelim.mod <- lm (Health_Score ~ Age+ BMI + Exercise_Frequency + Diet_Quality +
+                    Sleep_Hours + Smoking_Status + 
+             Alcohol_Consumption+ Diet_Quality:BMI, data = health1)
+
+tidy(prelim.mod, conf.int = TRUE)
+```
+
+```{r}
+summary(prelim.mod)
+```
+
+## Diagnostic plot
+
+```{r}
+plot(prelim.mod)
+```
+
+```{r}
+hist(prelim.mod$residuals)
+```
+
+## Testing homoscedasticity
+
+```{r}
+library(lmtest)
+```
+
+```{r}
+bptest(prelim.mod)
+```
+
+## Testing normality
+
+```{r}
+shapiro.test(prelim.mod$residuals)
+```
+
+## Plot residual against independent variables(numerical)in the model
+
+1.  Residual vs Age
+
+```{r}
+augment(prelim.mod) %>% 
+  ggplot(aes(Age, .resid))+
+  geom_point()+
+  geom_smooth()
+```
+
+2.  Residual vs Diet Quality
+
+```{r}
+augment(prelim.mod) %>% 
+  ggplot(aes(Diet_Quality, .resid))+
+  geom_point()+
+  geom_smooth()
+```
+
+3.  Residual vs Sleep Hours
+
+```{r}
+augment(prelim.mod) %>% 
+  ggplot(aes(Sleep_Hours, .resid))+
+  geom_point()+
+  geom_smooth()
+```
+
+4.  Residual vs Alcohol consumption
+
+```{r}
+augment(prelim.mod) %>% 
+  ggplot(aes(Alcohol_Consumption, .resid))+
+  geom_point()+
+  geom_smooth()
+```
+
+5.  Residual vs BMI
+
+```{r}
+augment(prelim.mod) %>% 
+  ggplot(aes(BMI, .resid))+
+  geom_point()+
+  geom_smooth()
+```
+
+6.  Residual vs Exercise Frequency
+
+```{r}
+augment(prelim.mod) %>% 
+  ggplot(aes(Exercise_Frequency, .resid))+
+  geom_point()+
+  geom_smooth()
+```
+
+Box-Cox transformation (to address non-normality and heteroscedasticity)
+
+```{r}
+MASS::boxcox(prelim.mod)
+```
+
+```{r}
+res.mod <- residuals(prelim.mod)
+head(res.mod)
+```
+
+Histogram of residual
+
+```{r}
+hist(res.mod)
+```
+
+# Prediction
+
+Generate prediction using augment()
+
+```{r}
+library(DT)
+health.pred.res <- augment(prelim.mod)
+health.pred.res %>% datatable()
+```
+
+# Influential observations
+
+```{r}
+cutoff <- 4/((nrow(health1)-length(prelim.mod$coefficients)-2))
+plot(prelim.mod, which = 4, cook.levels = cutoff)
+```
+
+Keep standardized residuals between 2 and -2 (values above 2 or lower than −2 considered as influential observations)
+
+```{r}
+non.influen.obs <-
+  health.pred.res %>% 
+  filter(.std.resid <2 & .std.resid > -2)
+```
+
+Re-run the Model with the non-influential observations (final model)
+
+```{r}
+prelim.mod2 <- lm(Health_Score~ Age+ BMI+ Exercise_Frequency+ Diet_Quality +
+                    Sleep_Hours +Smoking_Status + Alcohol_Consumption+
+                    Diet_Quality:BMI, data = non.influen.obs)
+
+summary(prelim.mod2)
+```
+
+Note: the R square improve after removing influential observation by 4%.
+
+```{r}
+tidy(prelim.mod2, conf.int = TRUE)
+```
+
+# Final model assumption
+
+## Rerun Diagnostic Plot
+
+```{r}
+plot(prelim.mod2)
+```
+
+## Homoscedasticity and normality test
+
+```{r}
+bptest(prelim.mod2)
+```
+
+```{r}
+shapiro.test(prelim.mod2$residuals)
+```
+
+## Residual vs numerical variables
+
+1.  Residual vs Age
+
+```{r}
+augment(prelim.mod2) %>% 
+  ggplot(aes(Age, .resid))+
+  geom_point()+
+  geom_smooth()
+```
+
+2.  Residual vs BMI
+
+```{r}
+augment(prelim.mod2) %>% 
+  ggplot(aes(BMI, .resid))+
+  geom_point()+
+  geom_smooth()
+```
+
+3.  Residual vs Exercise Frequency
+
+```{r}
+augment(prelim.mod2) %>% 
+  ggplot(aes(Exercise_Frequency, .resid))+
+  geom_point()+
+  geom_smooth()
+```
+
+4.  Residual vs Diet Quality
+
+```{r}
+augment(prelim.mod2) %>% 
+  ggplot(aes(Diet_Quality, .resid))+
+  geom_point()+
+  geom_smooth()
+```
+
+5.  Residual vs Sleep hours
+
+```{r}
+augment(prelim.mod2) %>% 
+  ggplot(aes(Sleep_Hours, .resid))+
+  geom_point()+
+  geom_smooth()
+```
+
+6.  Residual vs alcohol consumption
+
+```{r}
+augment(prelim.mod2) %>% 
+  ggplot(aes(Alcohol_Consumption, .resid))+
+  geom_point()+
+  geom_smooth()
+```
+
+## Histogram residual
+
+```{r}
+res.mod2 <- residuals(prelim.mod2)
+hist(res.mod2)
+```
+
+# Final Regression Table
+
+```{r}
+tbl_regression(prelim.mod2) %>% add_glance_table(include= c(adj.r.squared)) %>%
+  bold_labels() %>%  italicize_labels() %>% 
+  as_gt() %>% 
+  gt::tab_header(title = "Multiple Linear Regression",
+                 subtitle = "With Interaction")
+```
+
+
+
+# Conclusion
+
+## Model equation
+
+```{r}
+library(equatiomatic)
+extract_eq(prelim.mod2, use_coefs = TRUE)
+```
+
+
+## Interpretation
+
+1. For every 1 year increase in age, the Health Score decrease by 0.23 points (95%CI: -0.26, -0.21), while controlling other variables (BMI, exercise frequency, diet quality, sleep hours, smoker, and alcohol consumption) 
+
+2. Each 1 unit increase in BMI reduce the Health score by 2.8 points (95%CI: -3.1,-2.5) while controlling other variables (Age, exercise frequency, diet quality, sleep hours, smoker and alcohol consumption)
+
+3. With increase in one more day per week in exercise frequency, there is an increase of 1.8 points of health score (95%CI: 1.6, 1.9) while controlling other variables (Age, BMI, diet quality, sleep hours, smoker, and alcohol consumption)
+
+4. Each unit increase in diet quality lead to 0.02 points increase in Health score (95%CI: -0.09, 0.13) while controlling other variables.(Age, BMI, exercise frequency, sleep hours, smoker and alcohol consumption)
+
+5. For every additional hour of sleep, it increase 2.5 points of the health score (95%CI: 2.3, 2.7) while controlling other variables (age, BMI, exercise frequency, diet quality, smoker, and alcohol consumption)
+
+6. Being a smoker decrease 3.8 points o health score (95%CI: -4.4, -3.3) compared to non-smoker while controlling for other variables (age, BMI, exercise frequency, diet quality, sleep hours and alcohol consumption)
+
+7. For each unit increase of alcohol consumption per week (average alcohol unit per week), the health score decrease 1.0 points (95%CI: -1.1, -0.86) while controlling other variables (Age, BMI, exercise frequency, diet quality, sleep hours, and smoker) 
+
+8. The interaction shows that the effect of diet quality on Health score depends on BMI. For every unit increase in both BMI and diet quality, the health score increase by 0.02 points (95%CI: 0.02, 0.03).
+
+9. The adjusted r square is 0.879. It shows that this model explains 87.9% of the variance in the outcome variables and it indicate a very good fit.  
+
+# Github repository 
+Visit this link for quarto document and raw data: <https://github.com/Aina0710/regression_analysis_G2>
